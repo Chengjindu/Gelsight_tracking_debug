@@ -3,8 +3,7 @@ import numpy as np
 import setting
 
 def init(frame):
-    RESCALE = setting.RESCALE
-    # Scale down to size of 1/RESCALE
+    RESCALE = 2
     return cv2.resize(frame, (0, 0), fx=1.0/RESCALE, fy=1.0/RESCALE)
 
 def init_HSR(img):
@@ -19,10 +18,10 @@ def init_HSR(img):
     h,w = img.shape[:2]
     map1, map2 = cv2.fisheye.initUndistortRectifyMap(K, D, np.eye(3), K, DIM, cv2.CV_16SC2)
     undistorted_img = cv2.remap(img, map1, map2, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
-    
+
     cv2.imshow('undistorted_img', undistorted_img) 
     cv2.waitKey(0)
-    
+
     return warp_perspective(undistorted_img)
 
 def warp_perspective(img):
@@ -44,27 +43,27 @@ def warp_perspective(img):
 
     return result
 
-
 def find_marker(frame):
     RESCALE = setting.RESCALE
     # Blur image to remove noise
     # The kernel size depends on the marker size. It should be able to cover the whole marker
     blur = cv2.GaussianBlur(frame, (int(63/RESCALE), int(63/RESCALE)), 0)
-    # cv2.imshow('blur', blur) 
+    cv2.imshow('blur', blur) 
 
     # subtract the surrounding pixels to magnify difference between markers and background
     diff = frame.astype(np.float32) - blur
-    # cv2.imshow('diff', diff.astype(np.uint8)) 
+    cv2.imshow('diff', diff.astype(np.uint8)) 
     
     diff *= 4.0
     diff[diff<0.] = 0.
     diff[diff>255.] = 255.
     diff = cv2.GaussianBlur(diff, (int(63/RESCALE), int(63/RESCALE)), 0)
-    # cv2.imshow('diff_Amp', diff.astype(np.uint8)) 
+    cv2.imshow('diff_Amp', diff.astype(np.uint8)) 
  
     # Switch image from BGR colorspace to HSV
+    # change yellowMin, yellowMax based on markers' color in HSV space
     hsv = cv2.cvtColor(diff.astype(np.uint8), cv2.COLOR_BGR2HSV)
-    # cv2.imshow('hsv', hsv) 
+    cv2.imshow('hsv', hsv) 
     
     # yellow range in HSV color space
     yellowMin = (0, 0, 32)
@@ -72,6 +71,8 @@ def find_marker(frame):
     
     # Sets pixels to white if in yellow range, else will be set to black
     mask = cv2.inRange(hsv, yellowMin, yellowMax)
+    cv2.imshow('mask', mask) 
+    cv2.waitKey(0)
 
     return mask
 
@@ -79,11 +80,11 @@ def find_marker(frame):
 def marker_center(mask, frame):
     RESCALE = setting.RESCALE
     
+    # Adjust the areaThresh1, areaThresh2 for the minimal and maximal size of markers
     areaThresh1=90/RESCALE**2
     areaThresh2=1920/RESCALE**2
     MarkerCenter = []
 
-    # The search of countour is in descending order in the y direction.
     contours=cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if len(contours[0])<25:  # if too little markers, then give up
         print("Too less markers detected: ", len(contours))
@@ -117,4 +118,8 @@ def draw_flow(frame, flow):
             if Occupied[i][j] <= -1:
                 color = (127, 127, 255)
             cv2.arrowedLine(frame, pt1, pt2, color, 2,  tipLength=0.2)
+
+
+
+
 

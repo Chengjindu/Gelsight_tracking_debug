@@ -9,45 +9,53 @@
 #include <pybind11/stl.h>
 namespace py = pybind11;
 
+// Define convenient types for vectors of doubles and vectors of vector of doubles.
 typedef std::vector<double> vd;
 typedef std::vector<std::vector<double>> vvd;
 
-#define MAXN 30
-#define MAXM 30
-#define MAXNM 900 
-#define PI 3.14159265
+// Define constants for maximum allowable markers and grid dimensions.
+#define MAXN 30     // Maximum number of rows in the marker grid.
+#define MAXM 30     // Maximum number of columns in the marker grid.
+#define MAXNM 900   // Maximum number of markers (product of rows and columns).
+#define PI 3.14159265 // Define PI for angle calculations.
 
-
+// Define a Point_t struct to represent a point with x and y coordinates and an identifier.
 struct Point_t
 {
-    double x, y;
-    int id;
+    double x, y;    // The x and y coordinates of the point.
+    int id;     // An identifier for the point.
 
-    Point_t(){
+    Point_t(){  // Default constructor.
     }
 
+     // Constructor with parameters to initialize a point.
     Point_t(double x, double y, double id=0){
         this->x = x;
         this->y = y;
         this->id = id;
     }
+
+    // Comparison operator to sort points. Sorts by x first, then by y if x is the same.
     bool operator<(Point_t other) const
     {
         return (x < other.x || (x == other.x && y < other.y));
     }
 
+    // Subtraction operator to get the vector (difference) between two points.
     Point_t operator-(Point_t other) const
     {
         Point_t ret(x-other.x, y-other.y);
         return ret;
     }
 
+    // Addition operator to get the new point by adding vector to the current point.
     Point_t operator+(Point_t other) const
     {
         Point_t ret(x+other.x, y+other.y);
         return ret;
     }
-
+    
+    // Division operator to scale down the vector by a double value.
     Point_t operator/(double other) const
     {
         Point_t ret(x/other, y/other);

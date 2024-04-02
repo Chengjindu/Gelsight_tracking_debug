@@ -1,12 +1,13 @@
-from lib import find_marker
+# from lib import find_marker
 import numpy as np
 import cv2
 import time
 import marker_dectection
 import sys
+import os
 import setting
 
-calibrate = False
+calibrate = False               # Calibration Check
 
 if len(sys.argv) > 1:
     if sys.argv[1] == 'calibrate':
@@ -24,41 +25,59 @@ cap = cv2.VideoCapture("data/GelSight_Shear_Test.mov")
 setting.init()
 RESCALE = setting.RESCALE
 
-# Create Mathing Class (this process needs to be automated)
-m = find_marker.Matching(
-    N_=setting.N_, 
-    M_=setting.M_, 
-    fps_=setting.fps_, 
-    x0_=setting.x0_, 
-    y0_=setting.y0_, 
-    dx_=setting.dx_, 
-    dy_=setting.dy_)
-"""
-N_, M_: the row and column of the marker array
-x0_, y0_: the coordinate of upper-left marker
-dx_, dy_: the horizontal and vertical interval between adjacent markers
-"""
+# # Create Mathing Class
+# m = find_marker.Matching(
+#     N_=setting.N_, 
+#     M_=setting.M_, 
+#     fps_=setting.fps_, 
+#     x0_=setting.x0_, 
+#     y0_=setting.y0_, 
+#     dx_=setting.dx_, 
+#     dy_=setting.dy_)
+# """
+# N_, M_: the row and column of the marker array
+# x0_, y0_: the coordinate of upper-left marker
+# dx_, dy_: the horizontal and vertical interval between adjacent markers
+# """
 
 # save video
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
 
+
 if gelsight_version == 'HSR':
     out = cv2.VideoWriter('output.mp4',fourcc, 30.0, (215,215))
 else:
-    out = cv2.VideoWriter('output.mp4',fourcc, 30.0, (1280//RESCALE,720//RESCALE))
+    # out = cv2.VideoWriter('output.mp4',fourcc, 30.0, (1280//RESCALE,720//RESCALE))
+    out = cv2.VideoWriter('output.mp4',fourcc, 30.0, (1280//2,720//2))
+
+folder_path = r'C:\Users\24887\Desktop\tracking-master\Testdata'
+
+image_files = [f for f in os.listdir(folder_path) if f.lower().endswith(('.jpg', '.jpeg', 'png'))]
+
+if len(image_files) >= 2:
+    img1_path = os.path.join(folder_path, image_files[0])
+    img2_path = os.path.join(folder_path, image_files[1])
+
+    img = cv2.imread(img2_path)
+    frame = cv2.imread(img1_path)
+
+    # Observation on the imported images
+    cv2.imshow('Image contact', img)
+    cv2.imshow('Image noncontact', frame)
+    cv2.waitKey(0)
+else:
+    print("Not enough images in the folder for comparison.")
 
 # for i in range(30): ret, frame = cap.read()
 
 while(True):
 
     # capture frame-by-frame
-    ret, frame = cap.read()
-    if not(ret):
-        break
+    # ret, frame = cap.read()
+    # if not(ret):
+    #     break
 
     frame_raw = frame.copy()
-    # cv2.imshow('raw',frame_raw)
-    # cv2.waitKey(0)
 
     # resize (or unwarp)
     if gelsight_version == 'HSR':
@@ -67,30 +86,27 @@ while(True):
         cv2.waitKey(0)
     else:
         frame = marker_dectection.init(frame)
-        # cv2.imshow('HSR', frame) 
-        # cv2.waitKey(0)
+        cv2.imshow('Bnz', frame) 
+        cv2.waitKey(0)
     # frame = marker_dectection.init_HSR(frame)
-
+       
     # find marker masks
     mask = marker_dectection.find_marker(frame)
-    # cv2.imshow('mask', mask) 
-    # cv2.waitKey(0)
 
-    # find marker centers and store as an array
+    # find marker centers
     mc = marker_dectection.marker_center(mask, frame)
-    # cv2.imshow('mask', mask) 
-    # cv2.waitKey(0)
+
 
     if calibrate == False:
         tm = time.time()
-        # # matching init
+        # matching init
         m.init(mc)
 
-        # # matching
+        # matching
         m.run()
         print(time.time() - tm)
 
-        # # matching result
+        # matching result
         """
         output: (Ox, Oy, Cx, Cy, Occupied) = flow
             Ox, Oy: N*M matrix, the x and y coordinate of each marker at frame 0
@@ -100,7 +116,7 @@ while(True):
         """
         flow = m.get_flow()
 
-        # # draw flow
+        # draw flow
         marker_dectection.draw_flow(frame, flow)
 
     mask_img = mask.astype(frame[0].dtype)
