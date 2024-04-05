@@ -3,4 +3,6 @@ src/__pycache__
 .DS_Store
 *.mp4
 
+.vscode/c_cpp_properties.json
+
 trackenv/
