@@ -4,5 +4,7 @@ src/__pycache__
 *.mp4
 
 .vscode/c_cpp_properties.json
+.vscode/settings.json
+
 
 trackenv/
