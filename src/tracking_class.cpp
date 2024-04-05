@@ -14,11 +14,25 @@ double sum(Point_t a){
     return (a.x*a.x + a.y*a.y);
 }
 
+// This method evaluates whether two markers, identified by indices i and j, 
+// can be considered sequential based on their spatial relationship.
 int Matching::precessor(int i, int j) {
-    return (degree[i][j] <= theta 
-        && degree[i][j] >= -theta 
-        && Dist[i][j] <= dmax 
-        && Dist[i][j] >= dmin);
+    
+    bool angleWithinThreshold = degree[i][j] <= theta && degree[i][j] >= -theta; //
+    // Check if the angle between markers i and j is within a specified range.
+    // This ensures that the markers are aligned within a certain angular tolerance
+    // helping to maintain the expected grid pattern.
+    bool distanceWithinBounds = Dist[i][j] <= dmax && Dist[i][j] >= dmin; //
+    // Check if the distance between markers i and j falls within acceptable bounds.
+    // 'dmin' and 'dmax' define the minimum and maximum acceptable distances between sequential markers.
+    // This distance constraint ensures that markers are neither too close together nor too far apart, 
+    // adhering to the expected spatial arrangement.
+
+    return angleWithinThreshold && distanceWithinBounds; //
+    // Return true (1) if both the angle and distance between markers i and j are within their respective thresholds,
+    // indicating that j can be considered a predecessor of i in the marker sequence.
+    // Otherwise, return false (0) if either condition is not met, indicating that the spatial relationship
+    // between these markers does not conform to the criteria for sequential markers.
 }
 
 // 1st initialization called by m = find_marker.Matching
@@ -69,7 +83,6 @@ Matching::Matching(int N_, int M_, int fps_, double x0_, double y0_, double dx_,
     // Defines a threshold for the maximum movement a marker can have 
     // between frames or from its initial position. 
     flow_difference_threshold = dx * 0.8; // Threshold for considering flow differences in matching.
-    // This parameter is likely used in the context of flow vector consistency between adjacent markers. 
     // In a grid, you would expect neighboring markers to have similar motion vectors (flows). 
     // If the difference between the flows of two adjacent markers exceeds this threshold, 
     // it could indicate an inconsistency in the tracking, such as one marker being incorrectly matched 
@@ -105,23 +118,31 @@ void Matching::init(std::vector<std::vector<double>> centers) {
         C[i].x = centers[i][0];
         C[i].y = centers[i][1];
         C[i].id = i;
-        // Coordinates in C are stored with the same sequence in mc
+        // Coordinates in C are defined with the same sequence in mc (in descending order in the y direction.)
         // std::cout<<C[i].x<<" "<<C[i].y<<" "<<std::endl;
     }
 
-    // init arrays for search
+    // Initialize the 'done' array to false for all markers indicating that none have been matched yet.
     memset(done, 0, sizeof(done));
+    // Initialize the 'occupied' array to -1 indicating all grid positions are currently unoccupied.
     memset(occupied, -1, sizeof(occupied));
-    minf = -1;
+    minf = -1; // Set the initial minimum cost to -1, as no cost has been calculated yet.
 
-    // sort by x-axis, if same by y-axis
-    std::sort(C, C+n);
+    // Sort the markers primarily by their x-coordinate (and y-coordinate if x's are equal).
+    std::sort(C, C+n); 
 
-    // calculate distance and angle O(N^2M^2)
+    // Calculate the pairwise squared distances and angles between all detected markers.
     for (i = 0; i < n; i++) {
         for (j = 0; j < i; j++) {
+            // Calculate the squared distance between marker i and marker j.
             Dist[i][j] = dist_sqr(C[i], C[j]);
-            degree[i][j] = asin(fabs(C[i].y - C[j].y) / sqrt(Dist[i][j])) * 180.0 / PI;
+            // Calculate the angle (in degrees) formed by the horizontal and the line connecting marker i and j.
+            degree[i][j] = asin(fabs(C[i].y - C[j].y) / sqrt(Dist[i][j])) * 180.0 / PI; //
+            // asin expects its argument to be in the range [−1,1]
+            // In the case that vertical distance is very close to the real distance 
+            // (when two points are on the same column)
+            // fabs(C[i].y - C[j].y) / sqrt(Dist[i][j]) could yield >1 result due to  
+            // inaccurate calculation results (propably caused by round up), resulting in NAN value.
         }
     }
 
@@ -132,31 +153,45 @@ void Matching::init(std::vector<std::vector<double>> centers) {
 // Calculates the number of missing and spare markers compared to the expected grid (N*M).
 // Calls Matching::dfs(...) to explore matching configurations.
 void Matching::run(){
+    // Variables to keep track of how many markers are missing or are spare compared to the expected grid.
     int missing, spare;
 
+    // Record the start time for performance measurement or to time the execution of the algorithm.
     time_st = clock();
 
-    missing = NM - n;
-    spare = n - NM;
+    missing = NM - n; // Expected number of markers minus detected markers.
+    spare = n - NM; // Detected markers minus expected number of markers.
+
+    // Ensure that 'missing' and 'spare' are not negative.
     missing = missing < 0 ? 0 : missing;
     spare = spare < 0 ? 0 : spare;
+
+    // First attempt to match detected markers to the grid using DFS algorithm.
     dfs(0, 0, missing, spare);
+
+    // Retry loop: If no valid configuration is found, retry up to three times with relaxed conditions.
     for(int t=1;t<=3;t++) {
-        if(minf == -1){
-            // std::cout<<"TRY AGAIN!!"<<std::endl;
+        if(minf == -1){ // Check if no valid match has been found yet.
+            // Reset 'done' and 'occupied' states for a fresh start.
             memset(done, 0, sizeof(done));
             memset(occupied, -1, sizeof(occupied));
+
+            // Retry matching with slightly relaxed constraints (allowing for one more missing and spare marker).
             dfs(0, 0, missing + 1, spare + 1);
         }
     }
+
     int i;
+    // Update the expected positions of markers with the best-found matches if this is the first run or a special condition.
     if (flag_record == 1){
-        flag_record = 0;
+        flag_record = 0; // Reset the flag.
         for (i = 0; i < n; i++){
+            // Use 'MinRow' and 'MinCol' indices to update the expected positions ('O') with the best-found positions ('C').
             O[MinRow[i]][MinCol[i]].x = C[i].x;
             O[MinRow[i]][MinCol[i]].y = C[i].y;
         }
     }
+    // Debugging or logging statement used to monitor the minimum cost found by the algorithm.
     // std::cout<<"MINF "<<minf<<"\t\t";
 }
 
@@ -169,11 +204,17 @@ void Matching::run(){
 // If minf is unset or improved upon, updates the best configuration found so far.
 // Invokes Matching::infer() to finalize the cost by inferring positions for unplaced markers.
 void Matching::dfs(int i, double cost, int missing, int spare){
-    // if(occupied[6][0] <= -1 && occupied[7][0] <= -1)
-    // std::cout<<i<<" "<<"COST: "<<cost<<"fmin: "<< minf<< " missing "<<missing<<" spare "<<spare<<std::endl;
-    if (((float)(clock()-time_st))/CLOCKS_PER_SEC >= 1.0 / fps) return;
+    // Time constraint check: If the algorithm has taken too long (exceeds 1/fps seconds), return early.
+    // This prevents the algorithm from running indefinitely on difficult-to-solve instances.
+    // if (((float)(clock()-time_st))/CLOCKS_PER_SEC >= 1.0 / fps) return;
+
+    // Cost checks: If the current cost path is no better than what we have already found (minf),
+    // or it exceeds some predefined threshold, abandon this path.
     if(cost >= minf && minf != -1) return;
     if(cost >= cost_threshold) return;
+
+    // Base case: All points have been processed.
+    // Here, 'infer' is likely used to handle any remaining mismatches or gaps in the matching.
     int j, k, count = 0, flag, m, same_col;
     double c;
     if (i >= n) {
@@ -209,7 +250,7 @@ void Matching::dfs(int i, double cost, int missing, int spare){
     for (j=0;j<i;j++) {
         // if (i == 45) std::cout<<i<<" "<<j<<std::endl;
 
-        if (precessor(i, j)) {
+        if (precessor(i, j)) { // Check if placing marker 'i' after marker 'j' is valid.
             Row[i] = Row[j];
             Col[i] = Col[j] + 1;
             count++;
@@ -236,32 +277,40 @@ void Matching::dfs(int i, double cost, int missing, int spare){
 
 
     // if (count == 0) {
-        for (j=0;j<N;j++) {
-            if(done[j] == 0){
-                flag = 0;
-                for (int k = 0;k < N;k++) {
-                    // printf("%d %d %d %d\t\t", k, done[k], first[k], C[i].x);
-                    if (done[k] && 
-                        ((k < j && first[k] > C[i].y) || (k > j && first[k] < C[i].y))
-                        ){
-                        flag = 1;
-                        break;
-                    }
+    for (j=0;j<N;j++) { //This loop iterates over all possible rows where a marker could potentially be placed.
+        if(done[j] == 0){ // Check if the current row has not yet been processed.
+            flag = 0; // Initialize a flag to indicate if the current row is a valid placement.
+            for (int k = 0;k < N;k++) { // Iterate over all rows to ensure that placing the current marker 
+            // does not violate the vertical ordering based on the first marker placed in each row.
+                if (done[k] && // If a row is processed (done[k] is true) 
+                    ((k < j && first[k] > C[i].y) || (k > j && first[k] < C[i].y))
+                    ){ // and the placement violates vertical ordering,
+                    // Specifically, For Rows Above (k < j): If first[k] (the y coordinate of the first marker in a processed row above j) 
+                    // is greater than C[i].y (the y coordinate of the current marker), 
+                    // placing marker i in row j would incorrectly place it higher than a marker in a row above it, 
+                    // violating the expected vertical ordering. And vice versa
+                    flag = 1; // set the flag to indicate the current row is not a valid placement.
+                    break;
                 }
-                if (flag == 1) continue;
-                done[j] = 1;
-                first[j] = C[i].y;
-                Row[i] = j;
-                Col[i] = 0;
-
-                occupied[Row[i]][Col[i]] = i;
-                c = calc_cost(i);
-
-                dfs(i+1, cost+c, missing, spare);
-                done[j] = 0;
-                occupied[Row[i]][Col[i]] = -1;
             }
+
+            if (flag == 1) continue; // Skip to the next row if the current one is not a valid placement.
+            done[j] = 1; // Mark the current row as processed.
+            first[j] = C[i].y; // Record the y-coordinate of the first marker placed in this row.
+            Row[i] = j; // Assign the current marker to this row, starting from column 0.
+            Col[i] = 0;
+
+            occupied[Row[i]][Col[i]] = i; // Mark this grid cell as occupied by the current marker.
+            c = calc_cost(i); // Calculate the cost of placing the marker here.
+
+            dfs(i+1, cost+c, missing, spare); // Recursively attempt to place the next marker, updating the total cost.
+
+            // Backtrack: reset the state of the current row and grid cell to unoccupied,
+            // allowing for exploration of alternative placements.
+            done[j] = 0;
+            occupied[Row[i]][Col[i]] = -1;
         }
+    }
     // }
 
     // considering missing points

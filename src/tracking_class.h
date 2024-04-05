@@ -20,86 +20,95 @@ typedef std::vector<std::vector<double>> vvd;
 #define PI 3.14159265 // Define PI for angle calculations.
 
 // Define a Point_t struct to represent a point with x and y coordinates and an identifier.
+// Create the linear operation rule for spatial vetor calculation when point information are known
 struct Point_t
 {
     double x, y;    // The x and y coordinates of the point.
     int id;     // An identifier for the point.
 
-    Point_t(){  // Default constructor.
-    }
-
-     // Constructor with parameters to initialize a point.
-    Point_t(double x, double y, double id=0){
-        this->x = x;
-        this->y = y;
-        this->id = id;
+    // Parameterized constructor with default values, capable of acting as a default constructor.
+    Point_t(double x = 0.0, double y = 0.0, int id = 0) : x(x), y(y), id(id) {
+        // Initialization is done via the initializer list (after the colon).
     }
 
     // Comparison operator to sort points. Sorts by x first, then by y if x is the same.
-    bool operator<(Point_t other) const
-    {
-        return (x < other.x || (x == other.x && y < other.y));
+    bool operator<(const Point_t& other) const {
+        return x < other.x || (x == other.x && y < other.y);
     }
 
     // Subtraction operator to get the vector (difference) between two points.
-    Point_t operator-(Point_t other) const
-    {
-        Point_t ret(x-other.x, y-other.y);
-        return ret;
+    Point_t operator-(const Point_t& other) const {
+        return Point_t(x - other.x, y - other.y);
     }
 
     // Addition operator to get the new point by adding vector to the current point.
-    Point_t operator+(Point_t other) const
-    {
-        Point_t ret(x+other.x, y+other.y);
-        return ret;
+    Point_t operator+(const Point_t& other) const {
+        return Point_t(x + other.x, y + other.y);
     }
-    
+
     // Division operator to scale down the vector by a double value.
-    Point_t operator/(double other) const
-    {
-        Point_t ret(x/other, y/other);
-        return ret;
+    Point_t operator/(double scalar) const {
+        return Point_t(x / scalar, y / scalar);
     }
 };
 
+// The Matching class that handles the matching of detected markers to a pre-defined grid.
 class Matching{
 private:
     // double x_0 = 160, y_0 = 30, dx = 43.0, dy = 43.0; //GelSight Hanjun x1
-    double x_0, y_0, dx, dy; //GelSight Hanjun x0.5
+    // double x_0, y_0, dx, dy; //GelSight Hanjun x0.5
     // double x_0 = 34, y_0 = 37, dx = 27.0, dy = 27.0; //34 - 223,  37 - 200 GelSight_SX
     // double x_0 = 6, y_0 = 16, dx = 31.0, dy = 31.0; //6 - 130,  16 - 138 HSR x0.5
     // double x_0 = 12, y_0 = 32, dx = 62.0, dy = 62.0; //6 - 130,  16 - 138 HSR x1
     // double x_0 = 15, y_0 = 15, dx = 23.0, dy = 23.0; //15-195 15-202 HSR blue
 
-    int Row[MAXNM], Col[MAXNM];
-    int Dist[MAXNM][MAXNM], done[MAXN], occupied[MAXN][MAXM], first[MAXN];
-    int fps;
-    double degree[MAXNM][MAXNM];
-    double dmin, dmax, theta;
-    double moving_max;
-    double cost_threshold, flow_difference_threshold;
-    clock_t time_st;
+    double x_0, y_0; // Initial position (top-left corner) of the grid.
+    double dx, dy; // Intervals between markers horizontally and vertically.
+    int fps;// Frames per second of the video input for timing considerations.
 
-public:
-    int n;
-    int N, M, NM;
-    int flag_record = 1;
+    // Arrays used in the matching algorithm:
+    Point_t O[MAXN][MAXM], D[MAXN][MAXM]; // Expected and inferred marker positions.
+    Point_t C[MAXNM], MinD[MAXN][MAXM]; // Detected marker positions and the best inferred positions.
 
-    int MinRow[MAXNM], MinCol[MAXNM], MinOccupied[MAXN][MAXM];
-    double minf = -1;
+    // Arrays for tracking state during matching:
+    int Row[MAXNM], Col[MAXNM]; // Row and column indices for detected markers.
+    int MinRow[MAXNM], MinCol[MAXNM], MinOccupied[MAXN][MAXM]; // Best matching row, column indices, and occupancy.
 
-    Point_t O[MAXN][MAXM], D[MAXN][MAXM], C[MAXNM], MinD[MAXN][MAXM];
+    // Variables for matching calculations:
+    double degree[MAXNM][MAXNM]; // Angles between markers.
+    int Dist[MAXNM][MAXNM]; // Distances between markers.
+    int done[MAXN], occupied[MAXN][MAXM], first[MAXN]; // State flags for matching process.
+
+    // Thresholds for the matching algorithm:
+    double dmin, dmax; // Minimum and maximum squared distances between markers.
+    double theta; // Maximum angle deviation allowed for a valid match.
+    double moving_max; // Maximum allowed movement for markers between frames.
+    double minf = -1; // Tracks the minimum cost found during the matching process.
+    double cost_threshold, flow_difference_threshold; // Thresholds for cost calculations.
+    // 'done' flags each row to indicate whether it has been processed in the current search path.
+    // 'occupied' marks grid cells with the index of the marker placed there, or -1 if the cell is empty.
+    // 'first' records the y-coordinate of the first marker placed in each row to enforce vertical ordering constraints.
+
+    clock_t time_st; // Timing variable for performance measurement.
+
+    // Weights for cost function components.
     double K1 = 0.1, K2 = 1;
 
-    Matching(int N_=8, int M_=8, int fps_=30, double x_0 = 80., double y_0 = 15., double dx = 21.0, double dy = 21.0);
-    // void init(Point_t *centers, int count);
-    void init(std::vector<std::vector<double>> input);
-    int precessor(int i, int j);
-    double calc_cost(int i);
-    void dfs(int i, double cost, int missing, int spare);
-    void run();
-    std::tuple<vvd, vvd, vvd, vvd, vvd> get_flow();
-    std::tuple<double, double> test();
-    double infer();
+public:
+    int n; // Current number of detected markers.
+    int N, M, NM; // Dimensions of the grid and the total number of expected markers.
+    int flag_record = 1; // Flag indicating whether the current frame is the first record.
+
+    // Constructor declaration.
+    Matching(int N_ = 8, int M_ = 8, int fps_ = 30, double x0_ = 80., double y0_ = 15., double dx_ = 21.0, double dy_ = 21.0);
+
+    // Method declarations:
+    void init(std::vector<std::vector<double>> input); // Initializes the matching process with detected markers.
+    int precessor(int i, int j); // Checks if a marker is a valid predecessor.
+    double calc_cost(int i); // Calculates the cost of placing a marker.
+    void dfs(int i, double cost, int missing, int spare); // Recursive method for depth-first search in matching.
+    void run(); // Runs the matching algorithm.
+    std::tuple<vvd, vvd, vvd, vvd, vvd> get_flow(); // Retrieves the flow of markers after matching.
+    std::tuple<double, double> test(); // Tests the algorithm with dummy data.
+    double infer(); // Infers positions for unmatched markers.
 };
