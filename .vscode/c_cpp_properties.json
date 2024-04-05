@@ -4,7 +4,7 @@
             "name": "Linux",
             "includePath": [
                 "/usr/include/python3.8",
-                "/home/chengjin/Projects/GelSight/tracking/trackenv/lib/python3.8/site-packages/pybind11/include",
+                "/home/chengjin/Projects/Gelsight_codes/Gelsight_tracking_debug/trackenv/lib/python3.8/site-packages/pybind11/include",
                 "${workspaceFolder}/**"
             ],
             "defines": [],
