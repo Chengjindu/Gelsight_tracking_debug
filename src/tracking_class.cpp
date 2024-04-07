@@ -1,6 +1,8 @@
 // File Name: tracking.cpp
 // Author: Shaoxiong Wang
 // Create Time: 2018/12/20 10:11
+// Edit: Chengjin Du
+// Edit time: 2024/04/01 11：04
 
 #include "tracking_class.h"
 #include <iostream>
@@ -117,8 +119,8 @@ void Matching::init(std::vector<std::vector<double>> centers) {
     for (i = 0; i < n; i++){
         C[i].x = centers[i][0];
         C[i].y = centers[i][1];
-        C[i].id = i;
-        // Coordinates in C are defined with the same sequence in mc (in descending order in the y direction.)
+        C[i].id = i; // Coordinates in C are defined with the same sequence in mc 
+        // (in descending order in the y direction.)
         // std::cout<<C[i].x<<" "<<C[i].y<<" "<<std::endl;
     }
 
@@ -191,7 +193,7 @@ void Matching::run(){
             O[MinRow[i]][MinCol[i]].y = C[i].y;
         }
     }
-    // Debugging or logging statement used to monitor the minimum cost found by the algorithm.
+    // Debugging statement used to monitor the minimum cost found by the algorithm.
     // std::cout<<"MINF "<<minf<<"\t\t";
 }
 
@@ -213,10 +215,11 @@ void Matching::dfs(int i, double cost, int missing, int spare){
     if(cost >= minf && minf != -1) return;
     if(cost >= cost_threshold) return;
 
-    // Base case: All points have been processed.
-    // Here, 'infer' is likely used to handle any remaining mismatches or gaps in the matching.
     int j, k, count = 0, flag, m, same_col;
     double c;
+
+    // Base case: All points have been processed.
+    // Infer module: Handling any remaining mismatches or gaps in the matching.
     if (i >= n) {
         cost += infer();
         // printf("\nCOST: %lf\n", cost);
@@ -246,41 +249,48 @@ void Matching::dfs(int i, double cost, int missing, int spare){
         return;
     }
 
-
-    for (j=0;j<i;j++) {
+    // Main recursive Module: Try placing the current marker in all valid positions
+    // based on previously placed markers and the constraints of the problem.
+    for (j=0;j<i;j++) { // Check if placing marker 'i' after marker 'j' is valid.
         // if (i == 45) std::cout<<i<<" "<<j<<std::endl;
-
         if (precessor(i, j)) { // Check if placing marker 'i' after marker 'j' is valid.
-            Row[i] = Row[j];
-            Col[i] = Col[j] + 1;
+            Row[i] = Row[j]; // If positive, place it next to the marker 'j' in the same row
+            Col[i] = Col[j] + 1; //  and one column after
+            // Increment the counter that keeps track of how many valid placements we have found for this marker.
             count++;
+            // If the new column index is outside the bounds of the grid, skip this placement.
             if (Col[i] >= M) continue;
+            // If the proposed cell is already occupied, skip this placement.
             if (occupied[Row[i]][Col[i]] > -1) continue;
+            // If placing marker 'i' in the current row violates the vertical ordering
+            // with respect to any markers above it, skip this placement.
             if (Row[i] > 0 && occupied[Row[i]-1][Col[i]] > -1 && C[i].y <= C[occupied[Row[i]-1][Col[i]]].y) continue;
+            // Similarly, if it violates the ordering with respect to any markers below it, skip it.
             if (Row[i] < N - 1 && occupied[Row[i]+1][Col[i]] > -1 && C[i].y >= C[occupied[Row[i]+1][Col[i]]].y) continue;
-            int vflag = 0;
+            int vflag = 0; // This flag checks for vertical violations across the entire column.
             for (k=0;k<N;k++){
                 same_col = occupied[k][Col[i]];
+                // If another marker in the same column violates the vertical ordering, set the flag.
                 if(same_col > -1 && ((k < Row[i] && C[same_col].y > C[i].y) || (k > Row[i] && C[same_col].y < C[i].y))){
                     vflag = 1;
                     break;
                 }
             }
-            if (vflag == 1) continue;
-            occupied[Row[i]][Col[i]] = i;
+            if (vflag == 1) continue; // If the vertical violation flag is set, skip this placement.
+            occupied[Row[i]][Col[i]] = i; // Otherwise, mark this grid cell as occupied by marker 'i'.
 
-            c = calc_cost(i);
-            dfs(i+1, cost+c, missing, spare);
-            occupied[Row[i]][Col[i]] = -1;
+            c = calc_cost(i); // Calculate the cost of this placement.
+            dfs(i+1, cost+c, missing, spare); // Recur for the next marker.
+            occupied[Row[i]][Col[i]] = -1; // Reset cell state after returning from the recursion (backtracking).
         }
     }
 
-
-    // if (count == 0) {
+    // Alternative Placement Module: tries to find an unprocessed row where the marker can be placed 
+    // without violating the vertical ordering of the markers.
     for (j=0;j<N;j++) { //This loop iterates over all possible rows where a marker could potentially be placed.
         if(done[j] == 0){ // Check if the current row has not yet been processed.
             flag = 0; // Initialize a flag to indicate if the current row is a valid placement.
-            for (int k = 0;k < N;k++) { // Iterate over all rows to ensure that placing the current marker 
+            for (int k = 0; k < N; k++) { // Iterate over all rows to ensure that placing the current marker 
             // does not violate the vertical ordering based on the first marker placed in each row.
                 if (done[k] && // If a row is processed (done[k] is true) 
                     ((k < j && first[k] > C[i].y) || (k > j && first[k] < C[i].y))
@@ -296,9 +306,9 @@ void Matching::dfs(int i, double cost, int missing, int spare){
 
             if (flag == 1) continue; // Skip to the next row if the current one is not a valid placement.
             done[j] = 1; // Mark the current row as processed.
+            Row[i] = j; Col[i] = 0;// Assign the current marker as the first marker of this row.
             first[j] = C[i].y; // Record the y-coordinate of the first marker placed in this row.
-            Row[i] = j; // Assign the current marker to this row, starting from column 0.
-            Col[i] = 0;
+            
 
             occupied[Row[i]][Col[i]] = i; // Mark this grid cell as occupied by the current marker.
             c = calc_cost(i); // Calculate the cost of placing the marker here.
@@ -311,9 +321,10 @@ void Matching::dfs(int i, double cost, int missing, int spare){
             occupied[Row[i]][Col[i]] = -1;
         }
     }
-    // }
 
-    // considering missing points
+    // Missing markers Handling module: If no place was found for the current marker 'i',
+    // Try assigning it to new locations not directly following a predecessor,
+    // accounting for the possibility of missing markers in the sequence.
     // if (C[i].y > dy && C[i].y < O[0][M-1].y - dy / 2) return;
     for(m=1;m<=missing;m++){
         for (j=0;j<N;j++) {
@@ -333,10 +344,12 @@ void Matching::dfs(int i, double cost, int missing, int spare){
         }
     }
 
+    // Spare markers handling module: If there are more markers detected than expected,
+    // consider not assigning some markers to any grid position.
     if (spare > 0){
         Row[i] = -1;
         Col[i] = -1;
-        dfs(i+1, cost, missing, spare-1);
+        dfs(i+1, cost, missing, spare-1); // Recur with one less spare marker.
     }
 }
 
