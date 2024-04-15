@@ -63,6 +63,7 @@ def find_marker(frame):
     # cv2.imshow('diff_Amp', diff.astype(np.uint8)) 
  
     # Switch image from BGR colorspace to HSV
+    # change yellowMin, yellowMax based on markers' color in HSV space
     hsv = cv2.cvtColor(diff.astype(np.uint8), cv2.COLOR_BGR2HSV)
     # cv2.imshow('hsv', hsv) 
     
@@ -72,6 +73,8 @@ def find_marker(frame):
     
     # Sets pixels to white if in yellow range, else will be set to black
     mask = cv2.inRange(hsv, yellowMin, yellowMax)
+    # cv2.imshow('mask', mask) 
+    # cv2.waitKey(0)
 
     return mask
 
@@ -79,6 +82,7 @@ def find_marker(frame):
 def marker_center(mask, frame):
     RESCALE = setting.RESCALE
     
+    # Adjust the areaThresh1, areaThresh2 for the minimal and maximal size of markers
     areaThresh1=90/RESCALE**2
     areaThresh2=1920/RESCALE**2
     MarkerCenter = []

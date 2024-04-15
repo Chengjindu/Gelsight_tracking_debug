@@ -304,8 +304,8 @@ void Matching::dfs(int i, double cost, int missing, int spare){
         }
     }
 
-    // Alternative Placement Module: tries to find an unprocessed row where the marker can be placed 
-    // without violating the vertical ordering of the markers.
+    // Initial Placement Module: In the case that precessor is not found (when trasversing the first column) 
+    // This module tries to find an unprocessed row where the marker can be placed without violating the vertical ordering of the markers.
     for (j=0;j<N;j++) { //This loop iterates over all possible rows where a marker could potentially be placed.
         if(done[j] == 0){ // Check if the current row has not yet been processed.
             flag = 0; // Initialize a flag to indicate if the current row is a valid placement.
@@ -345,7 +345,10 @@ void Matching::dfs(int i, double cost, int missing, int spare){
     // Try assigning it to new locations not directly following a predecessor,
     // accounting for the possibility of missing markers in the sequence.
     // if (C[i].y > dy && C[i].y < O[0][M-1].y - dy / 2) return;
-    for(m=1;m<=missing;m++){
+    for(m=1;m<=missing;m++){ //The looping here is redundant, as the missing is added by 1 each time in the retry loop 
+        // within Matching::run. e.g. When missing = 2 there is no need to check again the m = 1 case as it is already 
+        // checked when trying to find a valid configuration for missing = 1
+        
         for (j=0;j<N;j++) { // Iterate over all rows of the grid.
             // if (j >= 1 && j < N - 1) continue;
             
@@ -360,14 +363,14 @@ void Matching::dfs(int i, double cost, int missing, int spare){
             // would exceed the grid's column limit.
             if(k+m+1>=M) continue;  
 
-            // Skip if the distance between the proposed placement spot and the current marker
+            // Skip if the distance between the proposed placement spot and the last missing marker
             // is beyond the moving_max threshold, indicating it's too far to be considered a valid placement.
             if (sqrt(sum(C[i] - O[j][k+m+1])) > moving_max) continue;
 
             // Temporarily mark the cells as occupied by missing markers (-2) to reserve the space.
             for(int t=1;t<=m;t++) occupied[j][k+t] = -2;
 
-            // Assign the current marker to the row and the column accounting for the missing markers.
+            // Assign the current marker one spot right to the last missing marker.
             Row[i] = j;
             Col[i] = k + m + 1;
             c = calc_cost(i); // Calculate the cost of this placement.
@@ -397,7 +400,7 @@ void Matching::dfs(int i, double cost, int missing, int spare){
 double Matching::calc_cost(int i){
     double c = 0, cost = 0; // Initialize cost variables.
     int left, up, down; // Indices for the left, up, and down neighbors of the current marker.
-    Point_t flow1, flow2; // Vectors representing movement fromP original to current position.
+    Point_t flow1, flow2; // Vectors representing movement from original to current position.
 
     // Initial cost based on the distance the marker has moved from its original position,
     // scaled by a predefined constant K1. This encourages markers to stay close to their starting points.
@@ -458,12 +461,14 @@ double Matching::infer(){
 
     Point_t moving;
 
+    // Position Inference Module (for Unplaced Markers)
     for(i = 0; i < N; i++){ // Iterate over each cell in the grid.
         for(j = 0;j < M; j++){
             if(occupied[i][j] <= -1){ // Only infer positions for cells that are not already occupied.
                 moving.x = 0; // This will hold the cumulative x movement for the cell.
                 moving.y = 0; // This will hold the cumulative y movement for the cell.
                 cnt = 0; // Counts the number of movements contributing to the inference.
+
                 for (k=0;k<4;k++){ // Check the immediate neighbours (in all four directions) for occupied cells.
                 // dir array defines the relative positions of these neighbours.
                     nx = i + dir[k][0];
@@ -500,7 +505,9 @@ double Matching::infer(){
                         }
                     }
                 }
-                if(cnt == 0){ // Further expanding the search if still no informative neighbors are found.
+
+                // Further expanding the search if still no informative neighbors are found.
+                if(cnt == 0){ 
                 // This loop further expands the search area to include an even larger square region,
                 // this time with side length of 2*(d+1), effectively covering neighbors two steps away in every direction.
                     for(x=i-d-1;x<=i+d+1;x++){
@@ -515,6 +522,7 @@ double Matching::infer(){
                         }
                     }
                 }
+
                 // Infer the position for the current cell based on the accumulated movement.
                 D[i][j] = O[i][j] + moving / (cnt + 1e-6); // Avoid division by zero.
 
@@ -531,10 +539,10 @@ double Matching::infer(){
 
     // Add a significant penalty if too many markers are inferred to be at the border,
     // indicating a potentially unrealistic configuration.
-    if(boarder_nb >= N -1 ) cost += 1e7;
+    if(boarder_nb >= N -1) cost += 1e7;
 
-    // Iterate over each cell in the grid to evaluate the inferred positions.
-    for(i = 0; i < N; i++){
+    // Cost Evaluation and Adjustment Module (for Border Markers)
+    for(i = 0; i < N; i++){ // Iterate over each cell in the grid to evaluate the inferred positions.
         for(j = 0;j < M; j++){
 
             // Focus only on cells that are not occupied by directly placed markers, implying inferred positions.

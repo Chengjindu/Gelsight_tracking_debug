@@ -94,3 +94,7 @@ output: (Ox, Oy, Cx, Cy, Occupied) = flow
         e.g. Occupied[i][j] = k, meaning the marker mc[k] lies in row i, column j.
 ```
 
+
+## Supplementary
+
+The matching mechanism is explained by the DFS diagram flow. While the details are annotated in the tracking_class.cpp.

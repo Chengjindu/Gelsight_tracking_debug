@@ -4,6 +4,7 @@ import cv2
 import time
 import marker_dectection
 import sys
+import os
 import setting
 
 calibrate = False
@@ -47,8 +48,6 @@ if gelsight_version == 'HSR':
 else:
     out = cv2.VideoWriter('output.mp4',fourcc, 30.0, (1280//RESCALE,720//RESCALE))
 
-# for i in range(30): ret, frame = cap.read()
-
 while(True):
 
     # capture frame-by-frame
@@ -83,14 +82,14 @@ while(True):
 
     if calibrate == False:
         tm = time.time()
-        # # matching init
+        # matching init
         m.init(mc)
 
-        # # matching
+        # matching
         m.run()
         print(time.time() - tm)
 
-        # # matching result
+        # matching result
         """
         output: (Ox, Oy, Cx, Cy, Occupied) = flow
             Ox, Oy: N*M matrix, the x and y coordinate of each marker at frame 0
@@ -100,7 +99,7 @@ while(True):
         """
         flow = m.get_flow()
 
-        # # draw flow
+        # draw flow
         marker_dectection.draw_flow(frame, flow)
 
     mask_img = mask.astype(frame[0].dtype)
