@@ -97,4 +97,5 @@ output: (Ox, Oy, Cx, Cy, Occupied) = flow
 
 ## Supplementary
 
-The matching mechanism is explained by the DFS diagram flow. While the details are annotated in the tracking_class.cpp.
+The matching mechanism is explained by the DFS diagram flow. 
+The detailed explainations are annotated in the tracking_class.cpp.
